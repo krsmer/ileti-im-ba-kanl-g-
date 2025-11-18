@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { login } from '@/lib/appwrite';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,18 +60,43 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Image/Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-[#0A1A2F] via-[#1A2F4F] to-[#2A3F5F] p-12 flex-col justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#00D9FF] text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
-          </div>
-          <span className="text-white font-heading font-semibold text-xl">İletişim Başkanlığı</span>
+      <div className="hidden lg:flex lg:w-1/2 bg-[#161F9C] p-12 flex-col justify-between relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
         </div>
         
-        <div className="text-white space-y-4">
+        {/* Diagonal Lines */}
+        <div className="absolute inset-0 opacity-5">
+          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="diagonal" width="80" height="80" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="80" stroke="white" strokeWidth="1"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#diagonal)" />
+          </svg>
+        </div>
+
+        {/* Content - positioned above patterns */}
+        <div className="relative z-10 flex items-center gap-3">
+          <Image
+            src="/public/logo_iletisim.png"
+            alt="İletişim Başkanlığı Logo"
+            width={20}
+            height={20}
+            className="object-contain"
+          />
+        </div>
+        
+        <div className="relative z-10 text-white space-y-4">
           <h2 className="text-4xl font-heading font-bold leading-tight">
             Stajyer Performans<br />Takip Sistemi
           </h2>
@@ -79,7 +105,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="text-gray-400 text-sm">
+        <div className="relative z-10 text-gray-400 text-sm">
           © 2025 İletişim Başkanlığı. Tüm hakları saklıdır.
         </div>
       </div>
@@ -121,7 +147,7 @@ export default function LoginPage() {
               <Field>
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-[#161F9C] hover:bg-[#1a23b0] cursor-pointer"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
