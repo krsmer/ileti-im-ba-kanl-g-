@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Users, Activity, TrendingUp, Award } from 'lucide-react';
 import { PieChart } from '@/components/charts/pie-chart';
 import { LineChart } from '@/components/charts/line-chart';
@@ -13,9 +22,14 @@ import {
   getTotalActivities,
   getMostActiveIntern,
   getCategoryDistribution,
+  getActivityTimeline,
   getCurrentUser,
   getUserProfile,
+  listAllActivities,
 } from '@/lib/appwrite';
+import type { Activity } from '@/lib/appwrite';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
@@ -28,6 +42,8 @@ export default function DashboardPage() {
     mostActiveIntern: { name: '-', count: 0 },
   });
   const [categoryData, setCategoryData] = useState<any>(null);
+  const [timelineData, setTimelineData] = useState<any>(null);
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -45,13 +61,15 @@ export default function DashboardPage() {
           router.push('/activities');
           return;
         }
-        const [totalInterns, todayActive, totalActivities, mostActive, categoryDist] =
+        const [totalInterns, todayActive, totalActivities, mostActive, categoryDist, timeline, activities] =
           await Promise.all([
             getTotalInterns(),
             getTodayActiveInterns(),
             getTotalActivities(),
             getMostActiveIntern(),
             getCategoryDistribution(),
+            getActivityTimeline(7),
+            listAllActivities(10),
           ]);
 
         setStats({
@@ -91,6 +109,42 @@ export default function DashboardPage() {
         };
 
         setCategoryData(pieData);
+
+        // Line chart için veri hazırla
+        const timelineObj = timeline.data || {};
+        const dates = Object.keys(timelineObj);
+        const lineData = {
+          labels: dates.map(date => {
+            const d = new Date(date);
+            return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+          }),
+          datasets: [
+            {
+              label: 'Aktivite Sayısı',
+              data: Object.values(timelineObj),
+              borderColor: 'rgba(22, 31, 156, 1)',
+              backgroundColor: 'rgba(22, 31, 156, 0.1)',
+              tension: 0.4,
+              fill: true,
+            },
+          ],
+        };
+
+        setTimelineData(lineData);
+
+        // Son aktiviteleri ayarla
+        if (activities.success && activities.data) {
+          const activitiesData = activities.data.documents.map((doc: any) => ({
+            $id: doc.$id,
+            userId: doc.userId,
+            userName: doc.userName,
+            category: doc.category,
+            description: doc.description,
+            date: doc.date,
+            $createdAt: doc.$createdAt,
+          }));
+          setRecentActivities(activitiesData);
+        }
       } catch (error) {
         console.error('Dashboard yükleme hatası:', error);
       } finally {
@@ -203,15 +257,64 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Aktivite Zaman Çizelgesi</CardTitle>
+              <CardTitle>Aktivite Trendi (Son 7 Gün)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] flex items-center justify-center">
-                <p className="text-gray-500">Yakında eklenecek...</p>
-              </div>
+              {timelineData ? (
+                <LineChart data={timelineData} />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center">
+                  <p className="text-gray-500">Veri yükleniyor...</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Son Aktiviteler */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Son Aktiviteler</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tarih</TableHead>
+                  <TableHead>Stajyer</TableHead>
+                  <TableHead>Kategori</TableHead>
+                  <TableHead>Açıklama</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentActivities.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-gray-500">
+                      Henüz aktivite bulunmuyor
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  recentActivities.map((activity) => (
+                    <TableRow key={activity.$id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(activity.date), 'd MMMM yyyy', { locale: tr })}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {activity.userName || 'Bilinmeyen'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{activity.category}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-md truncate">
+                        {activity.description}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

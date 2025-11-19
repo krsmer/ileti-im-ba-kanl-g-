@@ -420,4 +420,41 @@ export async function getCategoryDistribution() {
   }
 }
 
+/**
+ * Son N günün aktivite sayısını getir
+ */
+export async function getActivityTimeline(days: number = 7) {
+  try {
+    const activities = await databases.listDocuments({
+      databaseId: DATABASE_ID,
+      collectionId: ACTIVITIES_COLLECTION_ID,
+      queries: [Query.limit(1000), Query.orderDesc('date')]
+    });
+    
+    // Son N günü oluştur
+    const timeline: { [key: string]: number } = {};
+    const today = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      timeline[dateKey] = 0;
+    }
+    
+    // Aktiviteleri tarihe göre grupla
+    activities.documents.forEach((doc: any) => {
+      const activityDate = doc.date.split('T')[0];
+      if (timeline.hasOwnProperty(activityDate)) {
+        timeline[activityDate]++;
+      }
+    });
+    
+    return { success: true, data: timeline };
+  } catch (error: any) {
+    console.error('Get activity timeline error:', error);
+    return { success: false, error: error.message || 'Aktivite zaman çizelgesi getirilemedi' };
+  }
+}
+
 export { client };
