@@ -197,7 +197,7 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium text-gray-600">
                 Bugün Aktif
               </CardTitle>
-              <Activity className="h-4 w-4 text-green-600" />
+              <ActivityIcon className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
