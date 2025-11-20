@@ -196,6 +196,37 @@ export async function listAllInterns() {
   }
 }
 
+/**
+ * Kullanıcı profilini güncelle
+ */
+export async function updateUserProfile(documentId: string, data: { name?: string }) {
+  try {
+    const response = await databases.updateDocument({
+      databaseId: DATABASE_ID,
+      collectionId: USERS_COLLECTION_ID,
+      documentId: documentId,
+      data: data
+    });
+    return { success: true, data: response };
+  } catch (error: any) {
+    console.error('Update user profile error:', error);
+    return { success: false, error: error.message || 'Profil güncellenemedi' };
+  }
+}
+
+/**
+ * Kullanıcı şifresini güncelle
+ */
+export async function updatePassword(oldPassword: string, newPassword: string) {
+  try {
+    await account.updatePassword({ password: newPassword, oldPassword: oldPassword });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Update password error:', error);
+    return { success: false, error: error.message || 'Şifre güncellenemedi' };
+  }
+}
+
 // AKTİVİTE FONKSİYONLARI
 
 /**
