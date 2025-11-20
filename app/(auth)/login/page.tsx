@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { login } from '@/lib/appwrite';
+import { login, getCurrentUser, getUserProfile } from '@/lib/appwrite';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -45,8 +45,20 @@ export default function LoginPage() {
       
       if (result.success) {
         toast.success('Giriş başarılı!');
-        // Direkt activities'e git
-        window.location.href = '/activities';
+        
+        // Kullanıcı rolüne göre yönlendir
+        const userResult = await getCurrentUser();
+        if (userResult.success && userResult.data) {
+          const profile = await getUserProfile(userResult.data.$id);
+          
+          if (profile.role === 'yonetici') {
+            window.location.href = '/dashboard';
+          } else {
+            window.location.href = '/activities';
+          }
+        } else {
+          window.location.href = '/activities';
+        }
       } else {
         toast.error(result.error || 'Giriş başarısız');
         setIsLoading(false);
@@ -88,12 +100,12 @@ export default function LoginPage() {
 
         {/* Content - positioned above patterns */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg overflow-hidden bg-white p-2">
+          <div className="flex h-12 w-12 items-center justify-center">
             <Image
               src="/logo_iletisim.png"
               alt="İletişim Başkanlığı Logo"
-              width={40}
-              height={40}
+              width={48}
+              height={48}
               className="object-contain"
             />
           </div>
@@ -103,6 +115,16 @@ export default function LoginPage() {
           </div>
         </div>
         
+        <div className="relative z-10 flex items-center justify-center">
+          <Image
+            src="/landing-photo.png"
+            alt="Performans Takip"
+            width={600}
+            height={400}
+            className="object-contain"
+          />
+        </div>
+
         <div className="relative z-10 text-white space-y-4">
           <h2 className="text-4xl font-heading font-bold leading-tight">
             Stajyer Performans<br />Takip Sistemi

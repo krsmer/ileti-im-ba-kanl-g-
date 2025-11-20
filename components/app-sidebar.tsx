@@ -51,14 +51,9 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
       url: '/activities',
     },
     {
-      title: 'Yeni Aktivite',
-      icon: Plus,
-      url: '/activities/new',
-    },
-    {
-      title: 'Profilim',
-      icon: User,
-      url: '/profile',
+      title: 'Ayarlar',
+      icon: Settings,
+      url: '/settings',
     },
   ];
 
@@ -73,11 +68,6 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
       title: 'Tüm Stajyerler',
       icon: Users,
       url: '/students',
-    },
-    {
-      title: 'Aktiviteler',
-      icon: Activity,
-      url: '/activities',
     },
     {
       title: 'Ayarlar',

@@ -15,55 +15,97 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCurrentUser, getActivityByUser } from '@/lib/appwrite';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { getCurrentUser, getActivityByUser, deleteActivity } from '@/lib/appwrite';
 import type { Activity } from '@/lib/appwrite';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Plus, Calendar, Tag } from 'lucide-react';
+import { Plus, Calendar, Tag, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function ActivitiesPage() {
   const router = useRouter();
   const [activities, setActivities] = React.useState<Activity[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [userId, setUserId] = React.useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [activityToDelete, setActivityToDelete] = React.useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const loadActivities = React.useCallback(async () => {
+    try {
+      const userResult = await getCurrentUser();
+      
+      if (!userResult.success || !userResult.data) {
+        router.push('/login');
+        return;
+      }
+
+      setUserId(userResult.data.$id);
+      
+      const activitiesResult = await getActivityByUser(userResult.data.$id);
+      
+      if (activitiesResult.success && activitiesResult.data) {
+        const activitiesData = activitiesResult.data.documents.map((doc: any) => ({
+          $id: doc.$id,
+          userId: doc.userId,
+          userName: doc.userName,
+          category: doc.category,
+          description: doc.description,
+          date: doc.date,
+          $createdAt: doc.$createdAt,
+          $updatedAt: doc.$updatedAt,
+        }));
+        setActivities(activitiesData);
+      }
+    } catch (error) {
+      console.error('Failed to load activities:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
 
   React.useEffect(() => {
-    async function loadActivities() {
-      try {
-        const userResult = await getCurrentUser();
-        
-        if (!userResult.success || !userResult.data) {
-          router.push('/login');
-          return;
-        }
-
-        setUserId(userResult.data.$id);
-        
-        const activitiesResult = await getActivityByUser(userResult.data.$id);
-        
-        if (activitiesResult.success && activitiesResult.data) {
-          const activitiesData = activitiesResult.data.documents.map((doc: any) => ({
-            $id: doc.$id,
-            userId: doc.userId,
-            userName: doc.userName,
-            category: doc.category,
-            description: doc.description,
-            date: doc.date,
-            $createdAt: doc.$createdAt,
-            $updatedAt: doc.$updatedAt,
-          }));
-          setActivities(activitiesData);
-        }
-      } catch (error) {
-        console.error('Failed to load activities:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     loadActivities();
-  }, [router]);
+  }, [loadActivities]);
+
+  const handleDeleteClick = (activityId: string) => {
+    setActivityToDelete(activityId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!activityToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteActivity(activityToDelete);
+      
+      if (result.success) {
+        toast.success('Aktivite silindi');
+        await loadActivities();
+      } else {
+        toast.error(result.error || 'Aktivite silinemedi');
+      }
+    } catch (error) {
+      toast.error('Bir hata oluştu');
+      console.error(error);
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setActivityToDelete(null);
+    }
+  };
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -174,6 +216,7 @@ export default function ActivitiesPage() {
                     <TableHead>Tarih</TableHead>
                     <TableHead>Kategori</TableHead>
                     <TableHead>Açıklama</TableHead>
+                    <TableHead className="text-right">İşlemler</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -190,6 +233,25 @@ export default function ActivitiesPage() {
                       <TableCell className="max-w-md truncate">
                         {activity.description}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link href={`/activities/${activity.$id}/edit`}>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <Edit className="h-4 w-4" />
+                              Düzenle
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteClick(activity.$id!)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Sil
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -197,6 +259,28 @@ export default function ActivitiesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Aktiviteyi Sil</AlertDialogTitle>
+              <AlertDialogDescription>
+                Bu aktiviteyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>İptal</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? 'Siliniyor...' : 'Sil'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

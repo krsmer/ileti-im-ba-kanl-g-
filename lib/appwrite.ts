@@ -179,6 +179,54 @@ export async function getUserProfile(userId?: string): Promise<UserProfile> {
   }
 }
 
+/**
+ * Tüm stajyerleri listele
+ */
+export async function listAllInterns() {
+  try {
+    const response = await databases.listDocuments({
+      databaseId: DATABASE_ID,
+      collectionId: USERS_COLLECTION_ID,
+      queries: [Query.equal('role', 'stajyer')]
+    });
+    return { success: true, data: response };
+  } catch (error: any) {
+    console.error('List all interns error:', error);
+    return { success: false, error: error.message || 'Stajyerler getirilemedi' };
+  }
+}
+
+/**
+ * Kullanıcı profilini güncelle
+ */
+export async function updateUserProfile(documentId: string, data: { name?: string }) {
+  try {
+    const response = await databases.updateDocument({
+      databaseId: DATABASE_ID,
+      collectionId: USERS_COLLECTION_ID,
+      documentId: documentId,
+      data: data
+    });
+    return { success: true, data: response };
+  } catch (error: any) {
+    console.error('Update user profile error:', error);
+    return { success: false, error: error.message || 'Profil güncellenemedi' };
+  }
+}
+
+/**
+ * Kullanıcı şifresini güncelle
+ */
+export async function updatePassword(oldPassword: string, newPassword: string) {
+  try {
+    await account.updatePassword({ password: newPassword, oldPassword: oldPassword });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Update password error:', error);
+    return { success: false, error: error.message || 'Şifre güncellenemedi' };
+  }
+}
+
 // AKTİVİTE FONKSİYONLARI
 
 /**
@@ -417,6 +465,43 @@ export async function getCategoryDistribution() {
   } catch (error: any) {
     console.error('Get category distribution error:', error);
     return { success: false, error: error.message || 'Kategori dağılımı getirilemedi' };
+  }
+}
+
+/**
+ * Son N günün aktivite sayısını getir
+ */
+export async function getActivityTimeline(days: number = 7) {
+  try {
+    const activities = await databases.listDocuments({
+      databaseId: DATABASE_ID,
+      collectionId: ACTIVITIES_COLLECTION_ID,
+      queries: [Query.limit(1000), Query.orderDesc('date')]
+    });
+    
+    // Son N günü oluştur
+    const timeline: { [key: string]: number } = {};
+    const today = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      timeline[dateKey] = 0;
+    }
+    
+    // Aktiviteleri tarihe göre grupla
+    activities.documents.forEach((doc: any) => {
+      const activityDate = doc.date.split('T')[0];
+      if (timeline.hasOwnProperty(activityDate)) {
+        timeline[activityDate]++;
+      }
+    });
+    
+    return { success: true, data: timeline };
+  } catch (error: any) {
+    console.error('Get activity timeline error:', error);
+    return { success: false, error: error.message || 'Aktivite zaman çizelgesi getirilemedi' };
   }
 }
 
