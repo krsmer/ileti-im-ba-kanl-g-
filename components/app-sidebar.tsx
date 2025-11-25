@@ -36,49 +36,73 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   userProfile?: UserProfile;
 }
 
+// Menü öğelerini component dışına taşıyoruz - her render'da yeniden oluşturulmasını önler
+const STAJYER_MENU_ITEMS = [
+  {
+    title: 'Aktivitelerim',
+    icon: Activity,
+    url: '/activities',
+  },
+  {
+    title: 'Ayarlar',
+    icon: Settings,
+    url: '/settings',
+  },
+] as const;
+
+const YONETICI_MENU_ITEMS = [
+  {
+    title: 'Dashboard',
+    icon: LayoutDashboard,
+    url: '/dashboard',
+  },
+  {
+    title: 'Tüm Stajyerler',
+    icon: Users,
+    url: '/students',
+  },
+  {
+    title: 'Ayarlar',
+    icon: Settings,
+    url: '/settings',
+  },
+] as const;
+
+// getInitials fonksiyonunu component dışına taşıyoruz - pure function olarak
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
 export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
-  const isYonetici = userProfile?.role === 'yonetici';
+  // useMemo ile optimize - sadece role değiştiğinde yeniden hesaplanır
+  const isYonetici = React.useMemo(
+    () => userProfile?.role === 'yonetici',
+    [userProfile?.role]
+  );
 
-  // Stajyer menü öğeleri
-  const stajyerMenuItems = [
-    {
-      title: 'Aktivitelerim',
-      icon: Activity,
-      url: '/activities',
-    },
-    {
-      title: 'Ayarlar',
-      icon: Settings,
-      url: '/settings',
-    },
-  ];
+  // Menü öğelerini memoize ediyoruz
+  const menuItems = React.useMemo(
+    () => (isYonetici ? YONETICI_MENU_ITEMS : STAJYER_MENU_ITEMS),
+    [isYonetici]
+  );
 
-  // Yönetici menü öğeleri
-  const yoneticiMenuItems = [
-    {
-      title: 'Dashboard',
-      icon: LayoutDashboard,
-      url: '/dashboard',
-    },
-    {
-      title: 'Tüm Stajyerler',
-      icon: Users,
-      url: '/students',
-    },
-    {
-      title: 'Ayarlar',
-      icon: Settings,
-      url: '/settings',
-    },
-  ];
+  // User initials'ı memoize ediyoruz - sadece isim değiştiğinde hesaplanır
+  const userInitials = React.useMemo(
+    () => (userProfile?.name ? getInitials(userProfile.name) : ''),
+    [userProfile?.name]
+  );
 
-  const menuItems = isYonetici ? yoneticiMenuItems : stajyerMenuItems;
-
-  const handleLogout = async () => {
+  // useCallback ile handleLogout'u optimize ediyoruz - fonksiyon referansı stabil kalır
+  const handleLogout = React.useCallback(async () => {
     setIsLoggingOut(true);
     try {
       const result = await logout();
@@ -94,16 +118,7 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
     } finally {
       setIsLoggingOut(false);
     }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  }, [router]);
 
   return (
     <Sidebar {...props} className="backdrop-blur-md lg:bg-sidebar/60 bg-sidebar">
@@ -116,6 +131,7 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
               width={40}
               height={40}
               className="object-contain"
+              priority
             />
           </div>
           <div className="flex flex-col">
@@ -142,7 +158,7 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
                     asChild
                     isActive={pathname === item.url}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} prefetch={true}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -160,7 +176,7 @@ export function AppSidebar({ userProfile, ...props }: AppSidebarProps) {
             <div className="flex items-center gap-3">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  {getInitials(userProfile.name)}
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
