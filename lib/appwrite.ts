@@ -336,14 +336,15 @@ export async function getActivityByUser(userId: string, limit = 100) {
       })
     ]);
 
-    const documentsMap = new Map<string, Models.Document>();
+    type ActivityDoc = Models.Document & { date?: string };
+    const documentsMap = new Map<string, ActivityDoc>();
     [...ownerActivities.documents, ...participantActivities.documents].forEach((doc) => {
-      documentsMap.set(doc.$id, doc);
+      documentsMap.set(doc.$id, doc as ActivityDoc);
     });
 
     const mergedDocuments = Array.from(documentsMap.values()).sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
       return dateB - dateA;
     });
 

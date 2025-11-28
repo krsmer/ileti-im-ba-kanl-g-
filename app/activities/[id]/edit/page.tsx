@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/select';
 import { 
   getCurrentUser,
-  getUserProfile,
   getActivityByUser,
   updateActivity,
+  listAllInterns,
 } from '@/lib/appwrite';
-import type { Activity } from '@/lib/appwrite';
+import type { Activity, UserProfile } from '@/lib/appwrite';
+import type { Models } from 'appwrite';
 import { toast } from 'sonner';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -39,6 +40,23 @@ const CATEGORIES = [
   'Diğer'
 ];
 
+type ActivityDocument = Models.Document & {
+  userId?: string;
+  userName?: string;
+  category?: string;
+  description?: string;
+  date?: string;
+  participantIds?: string[];
+  managerComment?: string;
+};
+
+type InternDocument = Models.Document & {
+  userId?: string;
+  name?: string;
+  email?: string;
+  role?: 'stajyer' | 'yonetici';
+};
+
 export default function EditActivityPage() {
   const router = useRouter();
   const params = useParams();
@@ -51,6 +69,9 @@ export default function EditActivityPage() {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [interns, setInterns] = useState<UserProfile[]>([]);
+  const [isLoadingInterns, setIsLoadingInterns] = useState(true);
 
   useEffect(() => {
     const loadActivity = async () => {
@@ -61,14 +82,46 @@ export default function EditActivityPage() {
           return;
         }
 
+        try {
+          const internsResult = await listAllInterns();
+          if (internsResult.success && internsResult.data) {
+            const internProfiles = internsResult.data.documents
+              .map((doc) => {
+                const internDoc = doc as InternDocument;
+                if (!internDoc.userId || !internDoc.name) {
+                  return null;
+                }
+                return {
+                  $id: internDoc.$id,
+                  userId: internDoc.userId,
+                  name: internDoc.name,
+                  email: internDoc.email || '',
+                  role: internDoc.role || 'stajyer',
+                  $createdAt: internDoc.$createdAt,
+                  $updatedAt: internDoc.$updatedAt,
+                };
+              })
+              .filter((intern): intern is UserProfile => Boolean(intern));
+            setInterns(internProfiles);
+          }
+        } catch (error) {
+          console.error('Stajyer listesi yükleme hatası:', error);
+        } finally {
+          setIsLoadingInterns(false);
+        }
+
         // Kullanıcının aktivitelerini al
         const activitiesResult = await getActivityByUser(userResult.data.$id);
         if (activitiesResult.success && activitiesResult.data) {
           const foundActivity = activitiesResult.data.documents.find(
-            (doc: any) => doc.$id === activityId
-          );
+            (doc) => doc.$id === activityId
+          ) as ActivityDocument | undefined;
 
           if (foundActivity) {
+            if (!foundActivity.userId || !foundActivity.category || !foundActivity.description || !foundActivity.date) {
+              throw new Error('Aktivite verileri eksik');
+            }
+
             const activityData: Activity = {
               $id: foundActivity.$id,
               userId: foundActivity.userId,
@@ -76,6 +129,9 @@ export default function EditActivityPage() {
               category: foundActivity.category,
               description: foundActivity.description,
               date: foundActivity.date,
+              participantIds: Array.isArray(foundActivity.participantIds) && foundActivity.participantIds.length > 0
+                ? foundActivity.participantIds
+                : [foundActivity.userId],
               $createdAt: foundActivity.$createdAt,
               $updatedAt: foundActivity.$updatedAt,
             };
@@ -84,6 +140,7 @@ export default function EditActivityPage() {
             setCategory(activityData.category);
             setDescription(activityData.description);
             setDate(activityData.date.split('T')[0]);
+            setParticipants(activityData.participantIds || [activityData.userId]);
           } else {
             toast.error('Aktivite bulunamadı');
             router.push('/activities');
@@ -113,10 +170,21 @@ export default function EditActivityPage() {
 
     setIsSubmitting(true);
     try {
+      const participantIds = Array.from(new Set([activity.userId, ...participants]));
+      const participantNames = participantIds
+        .map((id) => {
+          if (id === activity.userId) return activity.userName;
+          const intern = interns.find((i) => i.userId === id);
+          return intern?.name;
+        })
+        .filter((name): name is string => Boolean(name));
+
       const result = await updateActivity(activity.$id!, {
         category,
         description,
         date: new Date(date).toISOString(),
+        participantIds,
+        participantNames,
       });
 
       if (result.success) {
@@ -219,6 +287,60 @@ export default function EditActivityPage() {
                 <p className="text-sm text-muted-foreground">
                   {description.length} / 2000 karakter
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Stajyerler</Label>
+                <div className="space-y-3 rounded-md border p-3">
+                  {isLoadingInterns ? (
+                    <p className="text-sm text-muted-foreground">Stajyerler yükleniyor...</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Seni otomatik olarak aktiviteye ekledik. Birlikte çalıştığın stajyerleri güncelleyebilirsin.
+                      </p>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {interns
+                          .filter((intern) => intern.userId !== activity.userId)
+                          .map((intern) => {
+                            const selected = participants.includes(intern.userId);
+                            return (
+                              <label key={intern.userId} className="flex items-center gap-3 text-sm">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-gray-300"
+                                  checked={selected}
+                                  onChange={() => {
+                                    setParticipants((prev) => {
+                                      if (selected) {
+                                        return prev.filter((id) => id !== intern.userId);
+                                      }
+                                      return [...prev, intern.userId];
+                                    });
+                                  }}
+                                  disabled={isSubmitting}
+                                />
+                                <span>{intern.name}</span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                      {participants.length > 0 && (
+                        <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                          {participants.map((id) => {
+                            if (id === activity.userId) return null;
+                            const intern = interns.find((i) => i.userId === id);
+                            return (
+                              <span key={id} className="rounded-full bg-gray-100 px-3 py-1">
+                                {intern?.name || 'Bilinmeyen'}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3">
