@@ -65,6 +65,7 @@ export default function ActivitiesPage() {
           date: doc.date,
           $createdAt: doc.$createdAt,
           $updatedAt: doc.$updatedAt,
+          managerComment: doc.managerComment,
         }));
         setActivities(activitiesData);
       }
@@ -230,8 +231,13 @@ export default function ActivitiesPage() {
                           {activity.category}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-md truncate">
-                        {activity.description}
+                      <TableCell className="max-w-md">
+                        <p className="truncate">{activity.description}</p>
+                        {activity.managerComment && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            Yönetici Yorumu: {activity.managerComment}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

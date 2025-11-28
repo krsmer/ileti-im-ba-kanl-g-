@@ -14,6 +14,15 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { PieChart } from '@/components/charts/pie-chart';
 import { LineChart } from '@/components/charts/line-chart';
@@ -21,7 +30,7 @@ import {
   getCurrentUser, 
   getUserProfile,
   getActivityByUser,
-  listAllInterns,
+  updateActivity,
 } from '@/lib/appwrite';
 import type { Activity, UserProfile } from '@/lib/appwrite';
 import { toast } from 'sonner';
@@ -41,6 +50,10 @@ export default function StudentDetailPage() {
   const [categoryData, setCategoryData] = useState<any>(null);
   const [timelineData, setTimelineData] = useState<any>(null);
   const [timelineDays, setTimelineDays] = useState(7);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [isSavingComment, setIsSavingComment] = useState(false);
 
   const getDateKey = (value: string | Date) => {
     const date = typeof value === 'string' ? new Date(value) : new Date(value);
@@ -62,6 +75,48 @@ export default function StudentDetailPage() {
     }
 
     return keys;
+  };
+
+  const handleOpenComment = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setCommentText(activity.managerComment || '');
+    setCommentDialogOpen(true);
+  };
+
+  const handleCloseComment = () => {
+    setCommentDialogOpen(false);
+    setSelectedActivity(null);
+    setCommentText('');
+  };
+
+  const handleSaveComment = async () => {
+    if (!selectedActivity?.$id) return;
+
+    setIsSavingComment(true);
+    try {
+      const result = await updateActivity(selectedActivity.$id, {
+        managerComment: commentText.trim(),
+      });
+
+      if (result.success) {
+        setActivities((prev) =>
+          prev.map((activity) =>
+            activity.$id === selectedActivity.$id
+              ? { ...activity, managerComment: commentText.trim() }
+              : activity
+          )
+        );
+        toast.success('Yorum kaydedildi');
+        handleCloseComment();
+      } else {
+        toast.error(result.error || 'Yorum kaydedilemedi');
+      }
+    } catch (error) {
+      console.error('Yorum kaydetme hatası:', error);
+      toast.error('Yorum kaydedilemedi');
+    } finally {
+      setIsSavingComment(false);
+    }
   };
 
   useEffect(() => {
@@ -96,6 +151,7 @@ export default function StudentDetailPage() {
             description: doc.description,
             date: doc.date,
             $createdAt: doc.$createdAt,
+            managerComment: doc.managerComment,
           }));
           setActivities(activitiesData);
 
@@ -362,12 +418,14 @@ export default function StudentDetailPage() {
                   <TableHead>Tarih</TableHead>
                   <TableHead>Kategori</TableHead>
                   <TableHead>Açıklama</TableHead>
+                  <TableHead>Yönetici Yorumu</TableHead>
+                  <TableHead className="text-right">İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {activities.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-gray-500">
+                    <TableCell colSpan={5} className="text-center text-gray-500">
                       Henüz aktivite bulunmuyor
                     </TableCell>
                   </TableRow>
@@ -383,6 +441,23 @@ export default function StudentDetailPage() {
                       <TableCell className="max-w-md">
                         {activity.description}
                       </TableCell>
+                      <TableCell className="max-w-xs text-sm text-gray-600">
+                        {activity.managerComment ? (
+                          <span>{activity.managerComment}</span>
+                        ) : (
+                          <span className="text-gray-400">Henüz yorum yok</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => handleOpenComment(activity)}
+                        >
+                          {activity.managerComment ? 'Yorumu Düzenle' : 'Yorum Ekle'}
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -391,6 +466,31 @@ export default function StudentDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={commentDialogOpen} onOpenChange={(open) => (!open ? handleCloseComment() : null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Yönetici Yorumu</DialogTitle>
+            <DialogDescription>
+              Bu aktivite için stajyere geri bildirim bırakabilirsiniz.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Yorumunuzu yazın"
+            rows={5}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseComment} disabled={isSavingComment}>
+              İptal
+            </Button>
+            <Button onClick={handleSaveComment} disabled={isSavingComment} className="bg-[#161F9C] hover:bg-[#1a23b0]">
+              {isSavingComment ? 'Kaydediliyor...' : 'Kaydet'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

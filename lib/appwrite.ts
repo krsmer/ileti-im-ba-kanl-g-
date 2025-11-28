@@ -21,6 +21,7 @@ export interface Activity {
   category: string;
   description: string;
   date: string;
+  managerComment?: string;
   $createdAt?: string;
   $updatedAt?: string;
 }

@@ -153,6 +153,7 @@ export default function DashboardPage() {
             description: doc.description,
             date: doc.date,
             $createdAt: doc.$createdAt,
+            managerComment: doc.managerComment,
           }));
 
           const uniqueUserIds = Array.from(
